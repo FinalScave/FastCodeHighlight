@@ -1,0 +1,148 @@
+cmake_minimum_required(VERSION 3.10)
+project(fast-highlight)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+# compiler special
+if (MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus /utf-8")
+endif ()
+
+# initial config
+set(LINK_LIB)
+set(CMAKE_PROJECT_DIR ${CMAKE_SOURCE_DIR})
+set(SRC_DIR ${CMAKE_PROJECT_DIR}/src)
+set(3DPARTY_DIR ${CMAKE_PROJECT_DIR}/3dparty)
+
+# header search path
+list(APPEND INCLUDE_DIRS
+        ${SRC_DIR}/include
+        ${SRC_DIR}/core
+        ${3DPARTY_DIR}/include
+)
+include_directories(${INCLUDE_DIRS})
+
+# core source files
+file(GLOB_RECURSE CORE_SOURCE_FILES ${SRC_DIR}/core/*.*)
+
+# platform special
+set(PLATFORM_FILES)
+if (ANDROID)
+    file(GLOB_RECURSE PLATFORM_FILES ${CMAKE_PROJECT_DIR}/platform/Android/fast-code-highlight/src/main/cpp/*.*)
+    add_definitions(-DANDROID)
+elseif (WIN32)
+    add_definitions(-DWINDOWS -D_POSIX -D_POSIX_THREAD_SAFE_FUNCTIONS)
+    set(STATIC_LIB ON)
+elseif (EMSCRIPTEN)
+    add_definitions(-DWASM)
+    set(STATIC_LIB ON)
+    file(GLOB_RECURSE WASM_FILES ${CMAKE_PROJECT_DIR}/platform/Emscripten/*.*)
+    message(STATUS "add target: libfasthighlight for wasm")
+    add_executable("libfasthighlight" ${WASM_FILES})
+    target_link_libraries("libfasthighlight" PRIVATE ${CMAKE_PROJECT_NAME}
+            "--bind"
+            "-s WASM=1"
+            "-s MODULARIZE=1"
+            "-s EXPORT_NAME='fasthighlight'"
+            "-s EXPORT_ES6=1"
+            "-s FORCE_FILESYSTEM=1"
+            "-s ALLOW_MEMORY_GROWTH=1"
+            "-s EXPORTED_RUNTIME_METHODS=[\"FS\"]"
+    )
+endif ()
+
+# project shared/dynamic lib
+if (STATIC_LIB)
+    message(STATUS "add target: fast-highlight as static lib")
+    add_library(${CMAKE_PROJECT_NAME} STATIC ${CORE_SOURCE_FILES} ${PLATFORM_FILES})
+else ()
+    message(STATUS "add target: fast-highlight as dynamic lib")
+    add_library(${CMAKE_PROJECT_NAME} SHARED ${CORE_SOURCE_FILES} ${PLATFORM_FILES})
+endif ()
+
+# add library functions
+function(add_platform_library dir filename type)
+    if (${type} STREQUAL "STATIC")
+        add_library(${dir} STATIC IMPORTED)
+    elseif (${type} STREQUAL "SHARED")
+        add_library(${dir} SHARED IMPORTED)
+    else ()
+        message(FATAL_ERROR "Error: add_platform_library type must be STATIC/SHARED")
+    endif ()
+    set(LIB_PATH)
+    if (ANDROID)
+        set(LIB_PATH ${3DPARTY_DIR}/lib/${dir}/android/${CMAKE_ANDROID_ARCH_ABI}/${filename})
+    elseif (WIN32)
+        if (MSVC)
+            if(CMAKE_BUILD_TYPE STREQUAL "Release")
+                set(LIB_PATH ${3DPARTY_DIR}/lib/${dir}/windows/msvc/release/${filename})
+            else ()
+                set(LIB_PATH ${3DPARTY_DIR}/lib/${dir}/windows/msvc/debug/${filename})
+            endif ()
+        else ()
+            set(LIB_PATH ${3DPARTY_DIR}/lib/${dir}/windows/mingw64/${filename})
+        endif ()
+    elseif (EMSCRIPTEN)
+        set(LIB_PATH ${3DPARTY_DIR}/lib/${dir}/emscripten/${filename})
+    endif ()
+    message(STATUS "Add platform library: ${LIB_PATH}")
+    set_target_properties(${dir} PROPERTIES IMPORTED_LOCATION ${LIB_PATH})
+    set(LINK_LIB ${LINK_LIB} ${dir} PARENT_SCOPE)
+endfunction()
+
+# add library
+if (ANDROID)
+    add_platform_library(reflex libreflex_shared_lib.so SHARED)
+    find_library(ANDROID_LIB android)
+    find_library(LOG_LIB log)
+    set(LINK_LIB ${LINK_LIB} ${ANDROID_LIB} ${LOG_LIB})
+elseif (WIN32)
+    if (MSVC)
+        add_platform_library(reflex reflex_static_lib.lib STATIC)
+    else ()
+        add_platform_library(reflex libreflex_static_lib.a STATIC)
+    endif ()
+    set(LINK_LIB ${LINK_LIB} ws2_32)
+elseif (EMSCRIPTEN)
+    add_platform_library(reflex libreflex_static_lib.a STATIC)
+endif ()
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LINK_LIB})
+
+# merge static libs
+if (STATIC_LIB)
+    get_target_property(REFLEX_PATH reflex IMPORTED_LOCATION)
+    if(MSVC)
+        add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+                COMMAND link /lib /out:${CMAKE_BINARY_DIR}/temp_merged.lib "$<TARGET_FILE:${CMAKE_PROJECT_NAME}>" "${REFLEX_PATH}"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/temp_merged.lib "$<TARGET_FILE:${CMAKE_PROJECT_NAME}>"
+                COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/temp_merged.lib
+                COMMENT "Merging static library reflex into ${CMAKE_PROJECT_NAME} for MSVC"
+                VERBATIM
+        )
+    else()
+        if (WIN32)
+            set(EXT_OBJ obj)
+        else ()
+            set(EXT_OBJ o)
+        endif ()
+        add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/temp_extract
+                COMMAND cd ${CMAKE_BINARY_DIR}/temp_extract && ${CMAKE_AR} x ${REFLEX_PATH}
+                COMMAND cd ${CMAKE_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+                COMMAND ${CMAKE_AR} rcs ${CMAKE_BINARY_DIR}/temp_merged.a ${CMAKE_BINARY_DIR}/temp_extract/*.${EXT_OBJ}
+                COMMAND ${CMAKE_RANLIB} ${CMAKE_BINARY_DIR}/temp_merged.a
+                COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/temp_merged.a $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
+                COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/temp_merged.a
+                COMMENT "Merging static library reflex into ${CMAKE_PROJECT_NAME} for g++"
+                VERBATIM
+        )
+    endif()
+endif ()
+
+# test.cpp
+set(TEST_EXECUTABLE test)
+add_executable(${TEST_EXECUTABLE} ${SRC_DIR}/test.cpp)
+target_link_libraries(${TEST_EXECUTABLE} PRIVATE ${CMAKE_PROJECT_NAME})
