@@ -11,6 +11,9 @@ if (MSVC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus /utf-8")
 endif ()
 
+# options
+option(BUILD_TESTING "Includes testing source for unit tests" ON)
+
 # initial config
 set(LINK_LIB)
 set(CMAKE_PROJECT_DIR ${CMAKE_SOURCE_DIR})
@@ -142,7 +145,10 @@ if (STATIC_LIB)
     endif()
 endif ()
 
-# test.cpp
-set(TEST_EXECUTABLE test)
-add_executable(${TEST_EXECUTABLE} ${SRC_DIR}/test.cpp)
-target_link_libraries(${TEST_EXECUTABLE} PRIVATE ${CMAKE_PROJECT_NAME})
+# Unit tetss
+if (BUILD_TESTING)
+    message(STATUS "Unit tests enabled")
+    if (NOT ANDROID AND NOT EMSCRIPTEN)
+        add_subdirectory(${CMAKE_PROJECT_DIR}/tests)
+    endif ()
+endif()
