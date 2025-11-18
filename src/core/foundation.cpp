@@ -171,7 +171,7 @@ namespace NS_FASTHIGHLIGHT {
       updated_lines.push_back(lines[i]);
     }
 
-    lines = updated_lines;
+    lines = std::move(updated_lines);
   }
 
 }
