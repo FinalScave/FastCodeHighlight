@@ -1,8 +1,11 @@
 #ifndef FAST_HIGHLIGHT_ENGINE_H
 #define FAST_HIGHLIGHT_ENGINE_H
 
+#include <cstdint>
+#include <stdexcept>
 #include <unordered_map>
 #include "foundation.h"
+#include "nlohmann/json.hpp"
 
 namespace NS_FASTHIGHLIGHT {
   template<typename T>
@@ -10,37 +13,49 @@ namespace NS_FASTHIGHLIGHT {
   template<typename K, typename V, typename KeyHash = std::hash<K>, typename KeyEqual = std::equal_to<K>>
   using HashMap = std::unordered_map<K, V, KeyHash, KeyEqual>;
 
-  /// 匹配的每一个高亮块
-  struct Highlight {
-    /// 高亮块的范围
-    TextRange range;
-    /// 高亮块所匹配的style
-    String style;
-    /// 高亮块被匹配时所处的状态
-    String state;
-  };
+  /// 语法规则Json解析时的错误
+  class SyntaxRuleParseError : public std::exception {
+  public:
+    /// 缺少属性
+    static constexpr int kErrCodePropertyExpected = -1;
+    /// 属性内容错误
+    static constexpr int kErrCodePropertyInvalid = -2;
+    /// 正则表达式错误
+    static constexpr int kErrCodePatternInvalid = -3;
+    /// state错误
+    static constexpr int kErrCodeStateInvalid = -4;
+    /// json存在语法错误
+    static constexpr int kErrCodeJsonInvalid = -5;
 
-  /// 每一行的高亮块序列
-  struct LineHighlight {
-    List<Highlight> spans;
-  };
+    explicit SyntaxRuleParseError(int err_code);
+    explicit SyntaxRuleParseError(int err_code, const String& message);
+    explicit SyntaxRuleParseError(int err_code, const char* message);
 
-  /// 整个文本内容的高亮
-  struct DocumentHighlight {
-    List<LineHighlight> lines;
+    const char* what() const noexcept override;
+    const String& message() const noexcept;
+  private:
+    int err_code_;
+    String message_;
   };
 
   /// 匹配分析的最小单元(token)的规则
   struct TokenRule {
+    /// 正则表达式
     String pattern;
+    /// 高亮样式
     String style;
-    String state;
+    /// 要跳转的state
+    int32_t goto_state {-1};
   };
 
   /// 语法规则
   struct SyntaxRule {
     /// 语法规则的名称
     String name;
+    /// 支持的文件扩展名
+    List<String> file_extensions_;
+    /// variables
+    HashMap<String, String> variables_map_;
     /// state 到 token规则的映射
     HashMap<String, List<TokenRule>> state_rules_map_;
   };
@@ -50,42 +65,81 @@ namespace NS_FASTHIGHLIGHT {
   public:
     /// 通过json解析语法规则
     /// @param json 语法规则文件的json
-    SyntaxRule& loadSyntaxRule(const String& json);
+    /// @param error 用于接收解析语法规则文件时的错误
+    Ptr<SyntaxRule> loadSyntaxRuleFromJson(const String& json);
 
     /// 获取指定名称的语法规则(如 java)
     /// @param extension 语法规则名称
-    SyntaxRule& getSyntaxRuleByName(const String& extension);
+    Ptr<SyntaxRule> getSyntaxRuleByName(const String& extension);
 
     /// 获取指定后缀名匹配的的语法规则(如 .t)
     /// @param extension 后缀名
-    SyntaxRule& getSyntaxRuleByExtension(const String& extension);
+    Ptr<SyntaxRule> getSyntaxRuleByExtension(const String& extension);
   private:
-    HashMap<String, SyntaxRule> name_rules_map_;
+    HashMap<String, Ptr<SyntaxRule>> name_rules_map_;
     static SyntaxRule kEmptyRule;
+
+    static void parseSyntaxName(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
+    static void parseFileExtensions(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
+    static void parseVariables(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
+    static void parseStates(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
   };
 
-  /// 高亮分析
-  class HighlightAnalyzer {
+  /// 匹配的每一个高亮块
+  struct TokenSpan {
+    /// 高亮块的范围
+    TextRange range;
+    /// 高亮块所匹配的style
+    String style;
+    /// 高亮块被匹配时所处的状态
+    int32_t state {0};
+    /// 高亮块要跳转的别的state
+    int32_t goto_state {-1};
+  };
+
+  /// 每一行的高亮块序列
+  struct LineHighlight {
+    List<TokenSpan> spans;
+  };
+
+  /// 整个文本内容的高亮
+  struct DocumentHighlight {
+    List<LineHighlight> lines;
+  };
+
+  /// 高亮分析器
+  class DocumentAnalyzer {
   public:
-    /// 加载文本并进行首次分析
-    /// @param text 文本内容
+    explicit DocumentAnalyzer(const Ptr<Document>& document);
+
+    /// 对整个文本进行高亮分析
     /// @return 整个文本的高亮结果
-    DocumentHighlight loadText(const String& text);
+    Ptr<DocumentHighlight> analyzeFully();
+
+    /// 根据patch内容重新分析整个文本的高亮结果
+    /// @param range patch的变更范围
+    /// @param new_text patch的文本
+    /// @return 整个文本的高亮结果
+    Ptr<DocumentHighlight> updateHighlight(const TextRange& range, const String& new_text);
+
+    /// 分析一行的高亮结果
+    /// @param line 行号
+    /// @return 一行的高亮结果
+    Ptr<LineHighlight> analyzeLine(size_t line);
   private:
-    PTR<Document> document_;
+    Ptr<Document> document_;
+    Ptr<DocumentHighlight> highlight_;
   };
 
   /// 高亮引擎
   class HighlightEngine {
   public:
     /// 加载文本并进行首次分析
-    /// @param text 文本内容
-    /// @param uri 文本所在文件的uri
+    /// @param document 文本内容
     /// @return 整个文本的高亮结果
-    DocumentHighlight loadText(const String& text, const String& uri);
+    Ptr<DocumentAnalyzer> loadDocument(const Ptr<Document>& document);
   private:
-    HashMap<String, DocumentHighlight> highlight_map_;
-    HashMap<String, PTR<Document>> document_map_;
+    HashMap<String, Ptr<DocumentAnalyzer>> analyzer_map_;
     SyntaxRuleManager syntax_rule_manager_;
   };
 }

@@ -5,7 +5,7 @@
 using namespace NS_FASTHIGHLIGHT;
 
 TEST_CASE("Patch Text") {
-  Document document("Line 1: Hello\nLine 2: World\nLine 3: End");
+  Document document("test.txt", "Line 1: Hello\nLine 2: World\nLine 3: End");
 
   std::cout << "Original text:" << std::endl;
   std::cout << document.getText() << std::endl << std::endl;
@@ -33,7 +33,7 @@ TEST_CASE("Patch Text") {
 
 TEST_CASE("Patch Benchmark") {
   BENCHMARK("Patch Performance") {
-    Document document("Line 1: Hello\nLine 2: World\nLine 3: End");
+    Document document("test.txt", "Line 1: Hello\nLine 2: World\nLine 3: End");
     document.patch(TextRange(TextPosition(0, 8), TextPosition(0, 9)), "H");
   };
 }

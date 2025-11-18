@@ -21,8 +21,12 @@ namespace NS_FASTHIGHLIGHT {
     if (end < start) throw std::invalid_argument("Invalid range: end before start");
   }
 
-  // ===================================== LineBasedText ============================================
-  Document::Document(const String& initial_text) {
+  // ===================================== Document ============================================
+  Document::Document(const String& uri, const String& initial_text): uri_(uri) {
+    setText(initial_text);
+  }
+
+  Document::Document(String&& uri, const String& initial_text): uri_(std::move(uri)) {
     setText(initial_text);
   }
 

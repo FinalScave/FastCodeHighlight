@@ -28,7 +28,8 @@ namespace NS_FASTHIGHLIGHT {
   /// 支持增量更新的文本
   class Document {
   public:
-    explicit Document(const String& initial_text = "");
+    explicit Document(const String& uri, const String& initial_text = "");
+    explicit Document(String&& uri, const String& initial_text = "");
 
     /// 设置完整的文本内容，设置后会按行分割
     /// @param text 文本内容
@@ -57,6 +58,7 @@ namespace NS_FASTHIGHLIGHT {
     /// @param range 范围
     void remove(const TextRange& range);
   private:
+    String uri_;
     std::vector<String> lines;
     bool isValidPosition(const TextPosition& pos) const;
     size_t positionToIndex(const TextPosition& pos) const;
