@@ -36,17 +36,7 @@ namespace NS_FASTHIGHLIGHT {
   }
 
   void Document::setText(const String& text) {
-    lines.clear();
-    String currentLine;
-    for (char c : text) {
-      if (c == '\n') {
-        lines.push_back(currentLine);
-        currentLine.clear();
-      } else {
-        currentLine += c;
-      }
-    }
-    lines.push_back(currentLine); // 最后一行
+    splitTextIntoLines(text, lines);
   }
 
   String Document::getText() const {
