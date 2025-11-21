@@ -2,12 +2,11 @@
 #define FAST_HIGHLIGHT_ENGINE_H
 
 #include <cstdint>
-#include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
-
+#include <nlohmann/json.hpp>
+#include <oniguruma/oniguruma.h>
 #include "foundation.h"
-#include "nlohmann/json.hpp"
 
 namespace NS_FASTHIGHLIGHT {
   template<typename T>
@@ -46,10 +45,26 @@ namespace NS_FASTHIGHLIGHT {
   struct TokenRule {
     /// 正则表达式
     String pattern;
-    /// 高亮样式
-    String style;
+    /// 按捕获组区分的高亮样式
+    HashMap<int32_t, String> styles;
+    /// Json解析到的跳转state文本
+    String goto_state_str;
+    /// token的捕获组在大表达式中的group偏移
+    int32_t group_offset {0};
     /// 要跳转的state
     int32_t goto_state {-1};
+  };
+
+  /// 每个state的规则
+  struct StateRule {
+    /// state名称
+    String name;
+    /// 每个token的规则
+    List<TokenRule> token_rules;
+    /// 每个token的表达式合并的大表达式
+    String merged_pattern;
+    /// 编译后的正则表达式指针
+    OnigRegex regex;
   };
 
   /// 语法规则
@@ -60,8 +75,17 @@ namespace NS_FASTHIGHLIGHT {
     HashSet<String> file_extensions_;
     /// variables
     HashMap<String, String> variables_map_;
-    /// state 到 token规则的映射
-    HashMap<String, List<TokenRule>> state_rules_map_;
+    /// state id 到 StateRule 的映射
+    HashMap<int32_t, StateRule> state_rules_map_;
+    /// state名称 到 id 的映射
+    HashMap<String, int32_t> state_id_map_;
+
+    int32_t getOrCreateStateId(const String& state_name);
+    SyntaxRule();
+  private:
+    int32_t id_counter_ {1};
+    constexpr static int32_t kDefaultStateId = 0;
+    constexpr static const char* kDefaultStateName = "default";
   };
 
   /// 语法规则管理器
@@ -77,15 +101,15 @@ namespace NS_FASTHIGHLIGHT {
 
     /// 获取指定后缀名匹配的的语法规则(如 .t)
     /// @param extension 后缀名
-    Ptr<SyntaxRule> getSyntaxRuleByExtension(const String& extension);
+    Ptr<SyntaxRule> getSyntaxRuleByExtension(const String& extension) const;
   private:
     HashMap<String, Ptr<SyntaxRule>> name_rules_map_;
-    static SyntaxRule kEmptyRule;
 
     static void parseSyntaxName(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
     static void parseFileExtensions(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
     static void parseVariables(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
     static void parseStates(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
+    static void parseState(StateRule& state_rule, const nlohmann::json& state_json);
   };
 
   /// 匹配的每一个高亮块
