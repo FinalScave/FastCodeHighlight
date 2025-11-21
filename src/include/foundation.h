@@ -7,9 +7,9 @@
 namespace NS_FASTHIGHLIGHT {
   /// 文本位置描述
   struct TextPosition {
-    /// 文字所处行
+    /// 文字所处行，起始为0
     size_t line;
-    /// 文字所处列
+    /// 文字所处列，起始为0
     size_t column;
 
     explicit TextPosition(size_t line = 0, size_t column = 0);
@@ -23,6 +23,7 @@ namespace NS_FASTHIGHLIGHT {
     TextPosition start;
     TextPosition end;
     TextRange(const TextPosition& start, const TextPosition& end);
+    bool contains(const TextPosition& pos) const;
   };
 
   /// 支持增量更新的文本
@@ -41,6 +42,20 @@ namespace NS_FASTHIGHLIGHT {
     /// 获取指定行的文本
     const String& getLine(size_t line) const;
 
+    /// 基于字符位置转为字节位置
+    /// @param pos 字符位置
+    /// @return 字节位置
+    size_t getBytePosition(const TextPosition& pos) const;
+
+    /// 基于行号和字节位置转为字符位置
+    /// @param line_index 行号
+    /// @param byte_pos 字节位置
+    /// @return 字符位置
+    TextPosition getCharPosition(size_t line_index, size_t byte_pos) const;
+
+    /// 取总字符数
+    size_t totalChars() const;
+
     /// 获取总行数
     size_t getLineCount() const;
 
@@ -48,6 +63,10 @@ namespace NS_FASTHIGHLIGHT {
     /// @param range 更新的范围区间
     /// @param new_text 更新后的文本
     void patch(const TextRange& range, const String& new_text);
+
+    /// 追加文本
+    /// @param text 要追加的文本
+    void appendText(const std::string& text);
 
     /// 在指定位置插入文本
     /// @param position 要插入的位置
@@ -61,9 +80,11 @@ namespace NS_FASTHIGHLIGHT {
     String uri_;
     std::vector<String> lines;
     bool isValidPosition(const TextPosition& pos) const;
-    size_t positionToIndex(const TextPosition& pos) const;
-    TextPosition indexToPosition(size_t index) const;
-    void patchMultiLine(const TextRange& range, const String& new_text);
+    size_t positionToCharIndex(const TextPosition& pos) const;
+    TextPosition charIndexToPosition(size_t char_index) const;
+    void splitTextIntoLines(const std::string& text, std::vector<std::string>& result);
+    void patchSingleLine(const TextRange& range, const std::vector<std::string>& new_lines);
+    void patchMultipleLines(const TextRange& range, const std::vector<std::string>& new_lines);
   };
 }
 
