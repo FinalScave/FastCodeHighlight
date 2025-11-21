@@ -36,6 +36,9 @@ set(PLATFORM_FILES)
 if (ANDROID)
     file(GLOB_RECURSE PLATFORM_FILES ${CMAKE_PROJECT_DIR}/platform/Android/fast-code-highlight/src/main/cpp/*.*)
     add_definitions(-DANDROID)
+elseif (OHOS)
+    #file(GLOB_RECURSE PLATFORM_FILES ${CMAKE_PROJECT_DIR}/platform/Android/fast-code-highlight/src/main/cpp/*.*)
+    add_definitions(-DOHOS)
 elseif (WIN32)
     add_definitions(-DWINDOWS -D_POSIX -D_POSIX_THREAD_SAFE_FUNCTIONS)
     set(STATIC_LIB ON)
@@ -78,6 +81,8 @@ function(add_platform_library dir filename type)
     set(LIB_PATH)
     if (ANDROID)
         set(LIB_PATH ${3DPARTY_DIR}/lib/${dir}/android/${CMAKE_ANDROID_ARCH_ABI}/${filename})
+    elseif (OHOS)
+        set(LIB_PATH ${3DPARTY_DIR}/lib/${dir}/ohos/${OHOS_ARCH}/${filename})
     elseif (WIN32)
         if (MSVC)
             if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -98,51 +103,30 @@ endfunction()
 
 # add library
 if (ANDROID)
-    add_platform_library(reflex libreflex_shared_lib.so SHARED)
+    add_platform_library(oniguruma libonig.so SHARED)
     find_library(ANDROID_LIB android)
     find_library(LOG_LIB log)
     set(LINK_LIB ${LINK_LIB} ${ANDROID_LIB} ${LOG_LIB})
+elseif (OHOS)
+    add_platform_library(oniguruma libonig.so SHARED)
+    set(LINK_LIB ${LINK_LIB} libace_napi.z.so libhilog_ndk.z.so)
 elseif (WIN32)
     if (MSVC)
-        add_platform_library(reflex reflex_static_lib.lib STATIC)
+        add_platform_library(oniguruma onig.lib STATIC)
     else ()
-        add_platform_library(reflex libreflex_static_lib.a STATIC)
+        add_platform_library(oniguruma libonig.a STATIC)
     endif ()
     set(LINK_LIB ${LINK_LIB} ws2_32)
 elseif (EMSCRIPTEN)
-    add_platform_library(reflex libreflex_static_lib.a STATIC)
+    add_platform_library(oniguruma libonig.a STATIC)
 endif ()
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ${LINK_LIB})
 
 # merge static libs
 if (STATIC_LIB)
-    get_target_property(REFLEX_PATH reflex IMPORTED_LOCATION)
-    if(MSVC)
-        add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
-                COMMAND link /lib /out:${CMAKE_BINARY_DIR}/temp_merged.lib "$<TARGET_FILE:${CMAKE_PROJECT_NAME}>" "${REFLEX_PATH}"
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_BINARY_DIR}/temp_merged.lib "$<TARGET_FILE:${CMAKE_PROJECT_NAME}>"
-                COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/temp_merged.lib
-                COMMENT "Merging static library reflex into ${CMAKE_PROJECT_NAME} for MSVC"
-                VERBATIM
-        )
-    else()
-        if (WIN32)
-            set(EXT_OBJ obj)
-        else ()
-            set(EXT_OBJ o)
-        endif ()
-        add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/temp_extract
-                COMMAND cd ${CMAKE_BINARY_DIR}/temp_extract && ${CMAKE_AR} x ${REFLEX_PATH}
-                COMMAND cd ${CMAKE_BINARY_DIR}/temp_extract && ${CMAKE_AR} x $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
-                COMMAND ${CMAKE_AR} rcs ${CMAKE_BINARY_DIR}/temp_merged.a ${CMAKE_BINARY_DIR}/temp_extract/*.${EXT_OBJ}
-                COMMAND ${CMAKE_RANLIB} ${CMAKE_BINARY_DIR}/temp_merged.a
-                COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/temp_merged.a $<TARGET_FILE:${CMAKE_PROJECT_NAME}>
-                COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/temp_merged.a
-                COMMENT "Merging static library reflex into ${CMAKE_PROJECT_NAME} for g++"
-                VERBATIM
-        )
-    endif()
+    include(MergeStaticLib.cmake)
+    get_target_property(ONIG_PATH oniguruma IMPORTED_LOCATION)
+    merge_static_libs(${CMAKE_PROJECT_NAME} ${ONIG_PATH})
 endif ()
 
 # Unit tetss

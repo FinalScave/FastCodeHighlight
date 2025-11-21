@@ -4,14 +4,18 @@
 #include <cstdint>
 #include <stdexcept>
 #include <unordered_map>
+#include <unordered_set>
+
 #include "foundation.h"
 #include "nlohmann/json.hpp"
 
 namespace NS_FASTHIGHLIGHT {
   template<typename T>
   using List = std::vector<T>;
-  template<typename K, typename V, typename KeyHash = std::hash<K>, typename KeyEqual = std::equal_to<K>>
-  using HashMap = std::unordered_map<K, V, KeyHash, KeyEqual>;
+  template<typename K, typename V, typename KeyHash = std::hash<K>, typename KeyEqualTo = std::equal_to<K>>
+  using HashMap = std::unordered_map<K, V, KeyHash, KeyEqualTo>;
+  template<typename T, typename Hash = std::hash<T>, typename EqualTo = std::equal_to<T>>
+  using HashSet = std::unordered_set<T, Hash, EqualTo>;
 
   /// 语法规则Json解析时的错误
   class SyntaxRuleParseError : public std::exception {
@@ -53,7 +57,7 @@ namespace NS_FASTHIGHLIGHT {
     /// 语法规则的名称
     String name;
     /// 支持的文件扩展名
-    List<String> file_extensions_;
+    HashSet<String> file_extensions_;
     /// variables
     HashMap<String, String> variables_map_;
     /// state 到 token规则的映射
@@ -65,8 +69,7 @@ namespace NS_FASTHIGHLIGHT {
   public:
     /// 通过json解析语法规则
     /// @param json 语法规则文件的json
-    /// @param error 用于接收解析语法规则文件时的错误
-    Ptr<SyntaxRule> loadSyntaxRuleFromJson(const String& json);
+    Ptr<SyntaxRule> compileSyntaxRuleFromJson(const String& json);
 
     /// 获取指定名称的语法规则(如 java)
     /// @param extension 语法规则名称

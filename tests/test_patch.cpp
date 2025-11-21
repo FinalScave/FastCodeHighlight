@@ -37,3 +37,25 @@ TEST_CASE("Patch Benchmark") {
     document.patch(TextRange(TextPosition(0, 8), TextPosition(0, 9)), "H");
   };
 }
+
+const char* text = R"(
+  aaa() 123;
+  aaa bb = 0;
+)";
+TEST_CASE("RE-flex Pattern") {
+  /*try {
+    reflex::Pattern pattern("(?:<rule1>([a-zA-Z]+))|(?:<rule2>[a-z]+\\b([a-z]))", "r");
+    reflex::Matcher matcher(pattern);
+    matcher.input(text);
+    size_t matches = matcher.matches();
+    std::cout << matches << std::endl;
+    /*size_t accept;
+    while ((accept = matcher.find()) != 0) {
+      std::cout << accept << std::endl;
+    }#1#
+  } catch (reflex::regex_error& er) {
+    std::cerr << er.what() << std::endl;
+  } catch (... ) {
+    std::cerr << "eeror" << std::endl;
+  }*/
+}

@@ -34,7 +34,7 @@ namespace NS_FASTHIGHLIGHT {
   }
 
   // ===================================== SyntaxRuleManager ============================================
-  Ptr<SyntaxRule> SyntaxRuleManager::loadSyntaxRuleFromJson(const String& json) {
+  Ptr<SyntaxRule> SyntaxRuleManager::compileSyntaxRuleFromJson(const String& json) {
     Ptr<SyntaxRule> syntax_rule = MAKE_PTR<SyntaxRule>();
     nlohmann::json root;
     try {
@@ -76,7 +76,7 @@ namespace NS_FASTHIGHLIGHT {
       }
       for (const nlohmann::json& element_json : extensions_json) {
         if (element_json.is_string()) {
-          rule->file_extensions_.push_back(element_json);
+          rule->file_extensions_.emplace(element_json);
         } else {
           throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid, "fileExtensions");
         }
@@ -85,7 +85,7 @@ namespace NS_FASTHIGHLIGHT {
       if (root.contains("fileExtension")) {
         nlohmann::json extensions_json = root["fileExtension"];
         if (extensions_json.is_string()) {
-          rule->file_extensions_.push_back(extensions_json);
+          rule->file_extensions_.emplace(extensions_json);
         } else {
           throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid, "fileExtension");
         }
