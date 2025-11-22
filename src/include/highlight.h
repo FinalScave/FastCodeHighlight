@@ -2,6 +2,7 @@
 #define FAST_HIGHLIGHT_ENGINE_H
 
 #include <cstdint>
+#include <iostream>
 #include <unordered_map>
 #include <unordered_set>
 #include <nlohmann/json.hpp>
@@ -45,14 +46,25 @@ namespace NS_FASTHIGHLIGHT {
   struct TokenRule {
     /// 正则表达式
     String pattern;
+    /// 是否跨行匹配
+    bool is_multi_line {false};
     /// 按捕获组区分的高亮样式
     HashMap<int32_t, String> styles;
     /// Json解析到的跳转state文本
     String goto_state_str;
+    /// token包含的正则表达式捕获组数量
+    int32_t group_count {0};
     /// token的捕获组在大表达式中的group偏移
     int32_t group_offset {0};
     /// 要跳转的state
     int32_t goto_state {-1};
+#ifdef FH_DEBUG
+    void dump() const {
+      const nlohmann::json json = *this;
+      std::cout << json.dump(4) << std::endl;
+    }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(TokenRule, pattern, is_multi_line, styles, goto_state_str, group_count, group_offset, goto_state);
+#endif
   };
 
   /// 每个state的规则
@@ -65,6 +77,15 @@ namespace NS_FASTHIGHLIGHT {
     String merged_pattern;
     /// 编译后的正则表达式指针
     OnigRegex regex;
+    /// 合并后大表达式的总捕获组数量
+    int32_t group_count {0};
+#ifdef FH_DEBUG
+    void dump() const {
+      const nlohmann::json json = *this;
+      std::cout << json.dump(4) << std::endl;
+    }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(StateRule, name, token_rules, merged_pattern, group_count);
+#endif
   };
 
   /// 语法规则
@@ -81,7 +102,15 @@ namespace NS_FASTHIGHLIGHT {
     HashMap<String, int32_t> state_id_map_;
 
     int32_t getOrCreateStateId(const String& state_name);
+    bool containsRule(int32_t state_id) const;
     SyntaxRule();
+#ifdef FH_DEBUG
+    void dump() const {
+      const nlohmann::json json = *this;
+      std::cout << json.dump(4) << std::endl;
+    }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(SyntaxRule, name, file_extensions_, variables_map_, state_rules_map_, state_id_map_);
+#endif
   private:
     int32_t id_counter_ {1};
     constexpr static int32_t kDefaultStateId = 0;
@@ -109,7 +138,9 @@ namespace NS_FASTHIGHLIGHT {
     static void parseFileExtensions(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
     static void parseVariables(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
     static void parseStates(const Ptr<SyntaxRule>& rule, nlohmann::json& root);
-    static void parseState(StateRule& state_rule, const nlohmann::json& state_json);
+    static void parseState(const Ptr<SyntaxRule>& rule, StateRule& state_rule, const nlohmann::json& state_json);
+    static void compileStatePattern(StateRule& state_rule);
+    static void replaceVariable(String& text, HashMap<String, String>& variables_map);
   };
 
   /// 匹配的每一个高亮块

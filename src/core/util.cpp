@@ -276,4 +276,44 @@ namespace NS_FASTHIGHLIGHT {
     return str;
 #endif
   }
+
+  // ===================================== PatternUtil ============================================
+  int32_t PatternUtil::countCaptureGroups(const String& pattern_str) {
+    int32_t count = 0;
+    bool escaped = false;
+
+    for (size_t i = 0; i < pattern_str.length(); ++i) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (pattern_str[i] == '\\') {
+        escaped = true;
+      } else if (pattern_str[i] == '(') {
+        // 检查是否是非捕获组
+        if (i + 2 < pattern_str.length() && pattern_str[i + 1] == '?' &&
+          (pattern_str[i + 2] == ':' || pattern_str[i + 2] == '=' ||
+            pattern_str[i + 2] == '!' || pattern_str[i + 2] == '<')) {
+          // 非捕获组，跳过
+          i += 2;
+        } else {
+          count++;
+        }
+      }
+    }
+    return count;
+  }
+
+  bool PatternUtil::isMultiLinePattern(const String& pattern_str) {
+    static std::vector<String> multi_line_indicators = {
+      R"(\\s\\S)", R"([\\s\\S])", "[^]*", ".*", R"(\\n)"
+    };
+    for (const auto& indicator : multi_line_indicators) {
+      if (pattern_str.find(indicator) != String::npos) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

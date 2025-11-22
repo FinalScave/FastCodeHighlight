@@ -13,6 +13,7 @@ endif ()
 
 # options
 option(BUILD_TESTING "Includes testing source for unit tests" ON)
+add_definitions(-DFH_DEBUG=1)
 
 # initial config
 set(LINK_LIB)

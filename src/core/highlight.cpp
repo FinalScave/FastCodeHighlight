@@ -46,6 +46,10 @@ namespace NS_FASTHIGHLIGHT {
     }
   }
 
+  bool SyntaxRule::containsRule(int32_t state_id) const {
+    return state_rules_map_.find(state_id) != state_rules_map_.end();
+  }
+
   SyntaxRule::SyntaxRule() {
     state_id_map_.insert_or_assign(kDefaultStateName, kDefaultStateId);
   }
@@ -64,6 +68,13 @@ namespace NS_FASTHIGHLIGHT {
     parseVariables(syntax_rule, root);
     parseStates(syntax_rule, root);
     name_rules_map_.insert_or_assign(syntax_rule->name, syntax_rule);
+    // 每个state都编译成一个大表达式
+    for (std::pair<const int32_t, StateRule>& pair : syntax_rule->state_rules_map_) {
+      compileStatePattern(pair.second);
+    }
+#ifdef FH_DEBUG
+    syntax_rule->dump();
+#endif
     return syntax_rule;
   }
 
@@ -138,7 +149,6 @@ namespace NS_FASTHIGHLIGHT {
     if (!variables_json.is_object()) {
       throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid, "variables");
     }
-    HashMap<String, String> variable_replacements;
     for (const auto& item : variables_json.items()) {
       const String& key = item.key();
       const nlohmann::json& variable_json = item.value();
@@ -146,13 +156,10 @@ namespace NS_FASTHIGHLIGHT {
         throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid, key);
       }
       rule->variables_map_.insert_or_assign(key, variable_json);
-      variable_replacements.insert_or_assign("${" + key + "}", variable_json);
     }
     // 变量有可能引用别的变量，所以全部遍历完后替换变量引用
     for (std::pair<const String, String>& pair : rule->variables_map_) {
-      for (const std::pair<const String, String>& replacement : variable_replacements) {
-        StrUtil::replaceAll(pair.second, replacement.first, replacement.second);
-      }
+      replaceVariable(pair.second, rule->variables_map_);
     }
   }
 
@@ -172,13 +179,26 @@ namespace NS_FASTHIGHLIGHT {
       }
       StateRule state_rule;
       state_rule.name = key;
-      parseState(state_rule, state_json);
+      parseState(rule, state_rule, state_json);
       int32_t state_id = rule->getOrCreateStateId(state_rule.name);
       rule->state_rules_map_.insert_or_assign(state_id, std::move(state_rule));
     }
+    // states解析完之后将每个token要跳转的state替换成state id
+    for (std::pair<const int32_t, StateRule>& pair : rule->state_rules_map_) {
+      for (TokenRule& token_rule : pair.second.token_rules) {
+        if (token_rule.goto_state_str.empty()) {
+          continue;
+        }
+        token_rule.goto_state = rule->getOrCreateStateId(token_rule.goto_state_str);
+        if (!rule->containsRule(token_rule.goto_state)) {
+          throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid,
+            "state: " + token_rule.goto_state_str);
+        }
+      }
+    }
   }
 
-  void SyntaxRuleManager::parseState(StateRule& state_rule, const nlohmann::json& state_json) {
+  void SyntaxRuleManager::parseState(const Ptr<SyntaxRule>& rule, StateRule& state_rule, const nlohmann::json& state_json) {
     for (const nlohmann::json& token_json : state_json) {
       if (!token_json.is_object()) {
         throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid, "state element");
@@ -188,9 +208,13 @@ namespace NS_FASTHIGHLIGHT {
       }
       TokenRule token_rule;
       token_rule.pattern = token_json["pattern"];
+      // pattern有可能引用变量，进行变量替换
+      replaceVariable(token_rule.pattern, rule->variables_map_);
+      // state
       if (token_json.contains("state")) {
         token_rule.goto_state_str = token_json["state"];
       }
+      // style / styles
       if (token_json.contains("style")) {
         token_rule.styles.insert_or_assign(0, token_json["style"]);
       } else if (token_json.contains("styles")) {
@@ -208,7 +232,60 @@ namespace NS_FASTHIGHLIGHT {
       } else {
         throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid, "style/styles");
       }
+      // multiLine
+      if (token_json.contains("multiLine")) {
+        const nlohmann::json& multi_line_json = token_json["multiLine"];
+        if (!multi_line_json.is_boolean()) {
+          throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePropertyInvalid, "multiLine");
+        }
+        token_rule.is_multi_line = multi_line_json;
+      } else {
+        token_rule.is_multi_line = PatternUtil::isMultiLinePattern(token_rule.pattern);
+      }
       state_rule.token_rules.push_back(std::move(token_rule));
+    }
+  }
+
+  void SyntaxRuleManager::compileStatePattern(StateRule& state_rule) {
+    String merged_pattern;
+    int32_t total_group_count {0};
+    size_t token_size = state_rule.token_rules.size();
+    // 将所有token的表达式合成一个大表达式
+    for (size_t i = 0; i < token_size; ++i) {
+      TokenRule& token_rule = state_rule.token_rules[i];
+      // 计算每个token的捕获组数量
+      token_rule.group_count = PatternUtil::countCaptureGroups(token_rule.pattern);
+      token_rule.group_offset = total_group_count;
+      if (i > 0) {
+        merged_pattern += "|";
+      }
+      merged_pattern += "(";
+      merged_pattern += token_rule.pattern;
+      merged_pattern += ")";
+      total_group_count += 1 + token_rule.group_count;
+    }
+    state_rule.group_count = total_group_count;
+    // 编译合并的大表达
+    OnigErrorInfo error;
+    OnigRegion* region = onig_region_new();
+    int status = onig_new(&state_rule.regex,
+      (OnigUChar*)merged_pattern.c_str(),
+      (OnigUChar*)(merged_pattern.c_str() + merged_pattern.length()),
+      ONIG_OPTION_DEFAULT,
+      ONIG_ENCODING_UTF8,
+      ONIG_SYNTAX_DEFAULT,
+      &error);
+    if (status != ONIG_NORMAL) {
+      onig_region_free(region, 1);
+      throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePatternInvalid, merged_pattern);
+    }
+    onig_region_free(region, 1);
+    state_rule.merged_pattern = std::move(merged_pattern);
+  }
+
+  void SyntaxRuleManager::replaceVariable(String& text, HashMap<String, String>& variables_map) {
+    for (const std::pair<const String, String>& pair : variables_map) {
+      text = StrUtil::replaceAll(text, "${" + pair.first + "}", pair.second);
     }
   }
 }

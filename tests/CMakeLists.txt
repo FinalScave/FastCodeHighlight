@@ -1,7 +1,8 @@
 set(TEST_PRODUCT_NAME test)
 add_executable(${TEST_PRODUCT_NAME}
         ${3DPARTY_DIR}/include/catch2/catch_amalgamated.cpp
-        test_patch.cpp
+        patch_text.cpp
+        parse_rule.cpp
 )
 
 target_include_directories(${TEST_PRODUCT_NAME} PRIVATE

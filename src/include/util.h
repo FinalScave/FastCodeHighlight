@@ -1,6 +1,8 @@
 #ifndef FAST_HIGHLIGHT_UTIL_H
 #define FAST_HIGHLIGHT_UTIL_H
 
+#include <cstdint>
+
 #include "macro.h"
 
 namespace NS_FASTHIGHLIGHT {
@@ -107,6 +109,22 @@ namespace NS_FASTHIGHLIGHT {
     /// @param str UTF8文本
     /// @return GBK文本
     static String convertUTF8ToGBK(const String& str);
+  };
+
+  /// Pattern处理工具
+  class PatternUtil {
+  public:
+    PatternUtil() = delete;
+    PatternUtil(const PatternUtil&) = delete;
+    PatternUtil& operator=(const PatternUtil&) = delete;
+
+    /// 计算一个Pattern中包含的捕获组数量
+    /// @param pattern_str Pattern字符串
+    static int32_t countCaptureGroups(const String& pattern_str);
+
+    /// 判断Pattern是否包含多行匹配
+    /// @param pattern_ptr Pattern字符串
+    static bool isMultiLinePattern(const String& pattern_ptr);
   };
 }
 
