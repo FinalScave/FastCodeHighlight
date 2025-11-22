@@ -2,28 +2,46 @@
 #define FASTCODEHIGHLIGHT_FOUNDATION_H
 
 #include <vector>
+
+#ifdef FH_DEBUG
+#include <nlohmann/json.hpp>
+#include <iostream>
+#endif
+
 #include "macro.h"
 
 namespace NS_FASTHIGHLIGHT {
   /// 文本位置描述
   struct TextPosition {
     /// 文字所处行，起始为0
-    size_t line;
+    size_t line {0};
     /// 文字所处列，起始为0
-    size_t column;
-
-    explicit TextPosition(size_t line = 0, size_t column = 0);
+    size_t column {0};
 
     bool operator<(const TextPosition& other) const;
     bool operator==(const TextPosition& other) const;
+#ifdef FH_DEBUG
+    void dump() const {
+      const nlohmann::json json = *this;
+      std::cout << json.dump(2) << std::endl;
+    }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(TextPosition, line, column);
+#endif
   };
 
   /// 文字的范围区间描述
   struct TextRange {
     TextPosition start;
     TextPosition end;
-    TextRange(const TextPosition& start, const TextPosition& end);
+
     bool contains(const TextPosition& pos) const;
+#ifdef FH_DEBUG
+    void dump() const {
+      const nlohmann::json json = *this;
+      std::cout << json.dump(2) << std::endl;
+    }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(TextRange, start, end);
+#endif
   };
 
   /// 支持增量更新的文本
@@ -35,6 +53,8 @@ namespace NS_FASTHIGHLIGHT {
     /// 设置完整的文本内容，设置后会按行分割
     /// @param text 文本内容
     void setText(const String& text);
+
+    String getUri() const;
 
     /// 获取完整文本
     String getText() const;

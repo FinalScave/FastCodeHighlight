@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <vector>
 #include <utf8/utf8.h>
 #ifdef _WIN32
@@ -5,6 +6,7 @@
 #else
 #include <iconv.h>
 #endif
+#include <fstream>
 #include "util.h"
 
 #ifdef _WIN32
@@ -315,5 +317,134 @@ namespace NS_FASTHIGHLIGHT {
       }
     }
     return false;
+  }
+
+  // ======================================== FileUtil =================================================
+#ifdef _WIN32
+  constexpr static char kPathSeparator = '\\';
+#else
+  constexpr static char kPathSeparator = '/';
+#endif
+
+  namespace fs = std::filesystem;
+  String FileUtil::getPathName(const String& path) {
+    const size_t index = path.find_last_of(kPathSeparator);
+    if (index == String::npos) {
+      return path;
+    }
+    return path.substr(index + 1);
+  }
+
+  String FileUtil::getExtension(const String& path) {
+    try {
+#ifdef _WIN32
+      fs::path fs_path = fs::u8path(path);
+#else
+      fs::path fs_path(path);
+#endif
+      return fs_path.extension().string();
+    } catch (const fs::filesystem_error& ex) {
+      return path;
+    }
+  }
+
+  String FileUtil::getParentPath(const String& path) {
+    try {
+#ifdef _WIN32
+      fs::path fs_path = fs::u8path(path);
+      return fs_path.parent_path().u8string();
+#else
+      fs::path fs_path(path);
+      return fs_path.parent_path().string();
+#endif
+    } catch (const fs::filesystem_error& ex) {
+      return path;
+    }
+  }
+
+  bool FileUtil::exists(const String& path) {
+    try {
+#ifdef _WIN32
+      fs::path fs_path = fs::u8path(path);
+#else
+      fs::path fs_path(path);
+#endif
+      return fs::exists(fs_path);
+    } catch (const fs::filesystem_error& ex) {
+      return false;
+    }
+  }
+
+  bool FileUtil::mkdirs(const String& path) {
+    try {
+#ifdef _WIN32
+      fs::path fs_path = fs::u8path(path);
+#else
+      fs::path fs_path(path);
+#endif
+      return fs::create_directories(fs_path);
+    } catch (const fs::filesystem_error& ex) {
+      return false;
+    }
+  }
+
+  bool FileUtil::mkdir(const String& path) {
+    try {
+#ifdef _WIN32
+      fs::path fs_path = fs::u8path(path);
+#else
+      fs::path fs_path(path);
+#endif
+      return fs::create_directory(fs_path);
+    } catch (const fs::filesystem_error& ex) {
+      return false;
+    }
+  }
+
+  bool FileUtil::isFile(const String& path) {
+    try {
+#ifdef _WIN32
+      fs::path fs_path = fs::u8path(path);
+#else
+      fs::path fs_path(path);
+#endif
+      return fs::exists(fs_path) && fs::is_regular_file(fs_path);
+    } catch (const fs::filesystem_error& ex) {
+      return false;
+    }
+  }
+
+  bool FileUtil::isDirectory(const String& path) {
+    try {
+#ifdef _WIN32
+      fs::path fs_path = fs::u8path(path);
+#else
+      fs::path fs_path(path);
+#endif
+      return fs::exists(fs_path) && fs::is_directory(fs_path);
+    } catch (const fs::filesystem_error& ex) {
+      return false;
+    }
+  }
+
+  String FileUtil::readString(const String& path) {
+#ifdef _WIN32
+    fs::path fs_path = fs::u8path(path);
+    std::ifstream in(fs_path, std::ios::binary);
+#else
+    std::ifstream in(path_, std::ios::binary);
+#endif
+    if (!in) {
+      return "";
+    }
+
+    in.seekg(0, std::ios::end);
+    const std::streamsize size = in.tellg();
+    in.seekg(0, std::ios::beg);
+
+    String content(size, '\0');
+    in.read(&content[0], size);
+    in.close();
+    return content;
   }
 }

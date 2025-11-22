@@ -58,10 +58,12 @@ namespace NS_FASTHIGHLIGHT {
     int32_t group_offset {0};
     /// 要跳转的state
     int32_t goto_state {-1};
+
+    static TokenRule kEmpty;
 #ifdef FH_DEBUG
     void dump() const {
       const nlohmann::json json = *this;
-      std::cout << json.dump(4) << std::endl;
+      std::cout << json.dump(2) << std::endl;
     }
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(TokenRule, pattern, is_multi_line, styles, goto_state_str, group_count, group_offset, goto_state);
 #endif
@@ -79,10 +81,12 @@ namespace NS_FASTHIGHLIGHT {
     OnigRegex regex;
     /// 合并后大表达式的总捕获组数量
     int32_t group_count {0};
+
+    static StateRule kEmpty;
 #ifdef FH_DEBUG
     void dump() const {
       const nlohmann::json json = *this;
-      std::cout << json.dump(4) << std::endl;
+      std::cout << json.dump(2) << std::endl;
     }
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(StateRule, name, token_rules, merged_pattern, group_count);
 #endif
@@ -103,18 +107,20 @@ namespace NS_FASTHIGHLIGHT {
 
     int32_t getOrCreateStateId(const String& state_name);
     bool containsRule(int32_t state_id) const;
+    StateRule& getStateRule(int32_t state_id);
     SyntaxRule();
+
+    constexpr static int32_t kDefaultStateId = 0;
+    constexpr static const char* kDefaultStateName = "default";
 #ifdef FH_DEBUG
     void dump() const {
       const nlohmann::json json = *this;
-      std::cout << json.dump(4) << std::endl;
+      std::cout << json.dump(2) << std::endl;
     }
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(SyntaxRule, name, file_extensions_, variables_map_, state_rules_map_, state_id_map_);
 #endif
   private:
     int32_t id_counter_ {1};
-    constexpr static int32_t kDefaultStateId = 0;
-    constexpr static const char* kDefaultStateName = "default";
   };
 
   /// 语法规则管理器
@@ -122,7 +128,7 @@ namespace NS_FASTHIGHLIGHT {
   public:
     /// 通过json解析语法规则
     /// @param json 语法规则文件的json
-    Ptr<SyntaxRule> compileSyntaxRuleFromJson(const String& json);
+    Ptr<SyntaxRule> compileSyntaxFromJson(const String& json);
 
     /// 获取指定名称的语法规则(如 java)
     /// @param extension 语法规则名称
@@ -147,28 +153,101 @@ namespace NS_FASTHIGHLIGHT {
   struct TokenSpan {
     /// 高亮块的范围
     TextRange range;
+    /// 匹配到的文本
+    String matched_text;
     /// 高亮块所匹配的style
     String style;
     /// 高亮块被匹配时所处的状态
     int32_t state {0};
     /// 高亮块要跳转的别的state
     int32_t goto_state {-1};
+#ifdef FH_DEBUG
+    void dump() const {
+      const nlohmann::json json = *this;
+      std::cout << json.dump(2) << std::endl;
+    }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(TokenSpan, range, style, state, goto_state);
+#endif
   };
 
   /// 每一行的高亮块序列
   struct LineHighlight {
     List<TokenSpan> spans;
+#ifdef FH_DEBUG
+    void dump() const {
+      const nlohmann::json json = *this;
+      std::cout << json.dump(2) << std::endl;
+    }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(LineHighlight, spans);
+#endif
   };
 
   /// 整个文本内容的高亮
   struct DocumentHighlight {
-    List<LineHighlight> lines;
+    List<Ptr<LineHighlight>> lines;
+
+    void addLine(const Ptr<LineHighlight>& line);
+    void reset();
+
+#ifdef FH_DEBUG
+    void dump() const {
+      nlohmann::json json = nlohmann::json::array();
+      for (const Ptr<LineHighlight>& line : lines) {
+        nlohmann::json line_obj;
+        to_json(line_obj, *line);
+        json.push_back(line_obj);
+      }
+      std::cout << json.dump(2) << std::endl;
+    }
+#endif
+  };
+
+  /// 正则匹配结果
+  struct MatchResult {
+    /// 是否匹配到了
+    bool matched {false};
+    /// 匹配到的起始字符位置
+    size_t start {0};
+    /// 匹配到的字符长度
+    size_t length {0};
+    /// 当前所处的state
+    int32_t state {-1};
+    /// 匹配到的所属token rule
+    int32_t token_rule_idx {-1};
+    /// 对应的TokenRule是否为跨行匹配
+    bool is_potential_multi_line {false};
+    /// 匹配到的捕获组
+    int32_t matched_group {-1};
+    /// 高亮样式
+    String style;
+    /// 要切换的state
+    int32_t goto_state {-1};
+    /// 匹配到的文本内容
+    String matched_text;
+  };
+
+  /// 跨行匹配时的上下文
+  struct MultiLineContext {
+    int32_t state {-1};
+    String style;
+    size_t start_line {0};
+    size_t start_column {0};
+    String accumulated_text;
+  };
+  struct MultiLineStartResult {
+    bool started {false};
+    int32_t new_state {-1};
+  };
+  struct MultiLineContinueResult {
+    bool completed {false};
+    TokenSpan span {};
+    int32_t new_state {-1};
   };
 
   /// 高亮分析器
   class DocumentAnalyzer {
   public:
-    explicit DocumentAnalyzer(const Ptr<Document>& document);
+    explicit DocumentAnalyzer(const Ptr<Document>& document, const Ptr<SyntaxRule>& rule);
 
     /// 对整个文本进行高亮分析
     /// @return 整个文本的高亮结果
@@ -187,18 +266,39 @@ namespace NS_FASTHIGHLIGHT {
   private:
     Ptr<Document> document_;
     Ptr<DocumentHighlight> highlight_;
+    Ptr<SyntaxRule> rule_;
+    HashMap<int32_t, MultiLineContext> multi_line_contexts_;
+    List<int32_t> line_states_;
+
+    Ptr<LineHighlight> analyzeLineWithState(size_t line, int32_t start_state);
+    MultiLineStartResult startMultiLineMatch(size_t line, size_t char_pos,
+      int32_t current_state, const MatchResult& match_result);
+    MultiLineContinueResult continueMultiLineMatch(size_t line, size_t char_pos, MultiLineContext& context);
+    bool isPotentialMultiLineMatch(const MatchResult& match_result, const String& line_text, size_t current_pos);
+    void processSingleLineMatch(Ptr<LineHighlight> highlight, size_t line_num,
+      size_t char_pos, int32_t state, const MatchResult& match_result);
+    MatchResult matchAtPosition(const String& text, size_t start_char_pos, int32_t state);
+    void findMatchedRuleAndGroup(const StateRule& state_rule, OnigRegion* region,
+      size_t match_start_byte, size_t match_end_byte, MatchResult& result);
+    size_t computeAffectedLines(const TextRange& range, const String& new_text);
   };
 
   /// 高亮引擎
   class HighlightEngine {
   public:
+    HighlightEngine();
+
+    /// 编译语法规则
+    /// @param json 语法规则的json文本
+    void compileSyntaxFromJson(const String& json) const;
+
     /// 加载文本并进行首次分析
     /// @param document 文本内容
     /// @return 整个文本的高亮结果
     Ptr<DocumentAnalyzer> loadDocument(const Ptr<Document>& document);
   private:
     HashMap<String, Ptr<DocumentAnalyzer>> analyzer_map_;
-    SyntaxRuleManager syntax_rule_manager_;
+    Ptr<SyntaxRuleManager> syntax_rule_manager_;
   };
 }
 

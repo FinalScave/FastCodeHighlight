@@ -4,7 +4,7 @@
 
 using namespace NS_FASTHIGHLIGHT;
 
-const char* rule_json = R"(
+const char* java_rule_json = R"(
 {
   "name": "java",
   "fileExtensions": [".java"],
@@ -51,19 +51,33 @@ const char* rule_json = R"(
   }
 }
 )";
+const char* java_code_text = R"(
+package com.test;
 
-TEST_CASE("Parse Rule") {
-  Ptr<SyntaxRuleManager> manager = MAKE_PTR<SyntaxRuleManager>();
-  try {
-    manager->compileSyntaxFromJson(rule_json);
-  } catch (SyntaxRuleParseError& error) {
-    std::cerr << error.what() << ": " << error.message() << std::endl;
+import java.util.*;
+
+public class Main {
+  public static void main() {
+    /**
+    aaaa
+    bbbb
+    */
+    System.out.println("HelloWorld");
   }
 }
+)";
 
-TEST_CASE("Parse Rule Benchmark") {
-  BENCHMARK("Parse Rule Performance") {
-    Ptr<SyntaxRuleManager> manager = MAKE_PTR<SyntaxRuleManager>();
-    manager->compileSyntaxFromJson(rule_json);
+TEST_CASE("Highlight Fully") {
+  Ptr<HighlightEngine> engine = MAKE_PTR<HighlightEngine>();
+  engine->compileSyntaxFromJson(java_rule_json);
+  Ptr<Document> document = MAKE_PTR<Document>("test.java", java_code_text);
+  Ptr<DocumentAnalyzer> analyzer = engine->loadDocument(document);
+  Ptr<DocumentHighlight> highlight = analyzer->analyzeFully();
+  highlight->dump();
+}
+
+TEST_CASE("Highlight Fully Benchmark") {
+  BENCHMARK("Highlight Fully Performance") {
+
   };
 }

@@ -3,6 +3,7 @@ add_executable(${TEST_PRODUCT_NAME}
         ${3DPARTY_DIR}/include/catch2/catch_amalgamated.cpp
         patch_text.cpp
         parse_rule.cpp
+        highlight_test.cpp
 )
 
 target_include_directories(${TEST_PRODUCT_NAME} PRIVATE

@@ -5,8 +5,6 @@
 
 namespace NS_FASTHIGHLIGHT {
   // ===================================== TextPosition ============================================
-  TextPosition::TextPosition(size_t line, size_t column): line(line), column(column) {
-  }
 
   bool TextPosition::operator<(const TextPosition& other) const {
     if (line != other.line) return line < other.line;
@@ -18,10 +16,6 @@ namespace NS_FASTHIGHLIGHT {
   }
 
   // ===================================== TextRange ============================================
-  TextRange::TextRange(const TextPosition& start, const TextPosition& end): start(start), end(end) {
-    if (end < start) throw std::invalid_argument("Invalid range: end before start");
-  }
-
   bool TextRange::contains(const TextPosition& pos) const {
     return !(pos < start) && (pos < end || pos == end);
   }
@@ -37,6 +31,10 @@ namespace NS_FASTHIGHLIGHT {
 
   void Document::setText(const String& text) {
     splitTextIntoLines(text, lines);
+  }
+
+  String Document::getUri() const {
+    return uri_;
   }
 
   String Document::getText() const {
@@ -67,11 +65,11 @@ namespace NS_FASTHIGHLIGHT {
 
   TextPosition Document::getCharPosition(size_t line_index, size_t byte_pos) const {
     if (line_index >= lines.size()) {
-      return TextPosition(line_index, 0);
+      return {line_index, 0};
     }
     const auto& line = lines[line_index];
     size_t char_pos = Utf8Util::bytePosToCharPos(line, byte_pos);
-    return TextPosition(line_index, char_pos);
+    return {line_index, char_pos};
   }
 
   size_t Document::totalChars() const {
@@ -125,7 +123,7 @@ namespace NS_FASTHIGHLIGHT {
     if (!isValidPosition(position)) {
       throw std::out_of_range("Invalid insert position");
     }
-    patch(TextRange(position, position), text);
+    patch({position, position}, text);
   }
 
   void Document::remove(const TextRange& range) {

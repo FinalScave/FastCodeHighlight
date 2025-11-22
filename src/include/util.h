@@ -126,6 +126,58 @@ namespace NS_FASTHIGHLIGHT {
     /// @param pattern_ptr Pattern字符串
     static bool isMultiLinePattern(const String& pattern_ptr);
   };
+
+  /// 文件操作工具类
+  class FileUtil {
+  public:
+    FileUtil() = delete;
+    FileUtil(const FileUtil&) = delete;
+    FileUtil& operator=(const FileUtil&) = delete;
+
+    /// 获取指定路径文件的名称
+    /// @param path 文件路径
+    /// @return 文件名称（包含后缀名）
+    static String getPathName(const String& path);
+
+    /// 获取指定路径文件的扩展名
+    /// @param path 文件路径
+    /// @return 文件扩展名
+    static String getExtension(const String& path);
+
+    /// 获取指定路径的所处目录
+    /// @param path 文件路径
+    /// @return 文件目录路径
+    static String getParentPath(const String& path);
+
+    /// 判断指定路径文件是否存在
+    /// @param path 文件路径
+    /// @return 如果文件存在返回true
+    static bool exists(const String& path);
+
+    /// 创建文件夹(会递归创建父目录)
+    /// @param path 文件夹路径
+    /// @return 创建成功返回true
+    static bool mkdirs(const String& path);
+
+    /// 创建文件夹(不递归创建父目录)
+    /// @param path 文件夹路径
+    /// @return 创建成功返回true
+    static bool mkdir(const String& path);
+
+    /// 判断指定路径是否为文件，不是文件夹
+    /// @param path 文件路径
+    /// @return 如果文件存在并且不是文件夹返回true
+    static bool isFile(const String& path);
+
+    /// 判断指定路径是否为文件夹，不是文件
+    /// @param path 文件路径
+    /// @return 如果文件夹存在并且不是文件返回true
+    static bool isDirectory(const String& path);
+
+    /// 读取指定文件的内容
+    /// @param path 文件路径
+    static String readString(const String& path);
+  };
 }
 
 #endif //FAST_HIGHLIGHT_UTIL_H
