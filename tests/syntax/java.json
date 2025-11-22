@@ -1,0 +1,49 @@
+{
+  "name": "java",
+  "fileExtensions": [".java"],
+  "variables": {
+    "identifierStart": "[\\p{Han}\\w_$]+",
+    "identifierPart": "[\\p{Han}\\w_$0-9]*",
+    "identifier": "${identifierStart}${identifierPart}"
+  },
+  "states": {
+    "default": [
+      {
+        "pattern": "\\b(class|interface|enum|package|import)\\b",
+        "style": "keyword"
+      },
+      {
+        "pattern": "\"(?:[^\"\\\\]|\\\\.)*\"",
+        "style": "string"
+      },
+      {
+        "pattern": "(${identifier})\\(",
+        "styles": [0, "method", 1, "operator"]
+      },
+      {
+        "pattern": "//.*",
+        "style": "comment"
+      },
+      {
+        "pattern": "/\\*",
+        "style": "comment",
+        "state": "longComment"
+      },
+      {
+        "pattern": "\\s\\S+",
+        "style": "text"
+      }
+    ],
+    "longComment": [
+      {
+        "pattern": "\\s\\S",
+        "style": "comment"
+      },
+      {
+        "pattern": "\\*/",
+        "style": "comment",
+        "state": "default"
+      }
+    ]
+  }
+}

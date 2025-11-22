@@ -1,83 +1,30 @@
 #include <iostream>
 #include "catch2/catch_amalgamated.hpp"
 #include "highlight.h"
+#include "util.h"
 
 using namespace NS_FASTHIGHLIGHT;
 
-const char* java_rule_json = R"(
-{
-  "name": "java",
-  "fileExtensions": [".java"],
-  "variables": {
-    "identifierStart": "[\\p{Han}\\w_$]+",
-    "identifierPart": "[\\p{Han}\\w_$0-9]*",
-    "identifier": "${identifierStart}${identifierPart}"
-  },
-  "states": {
-    "default": [
-      {
-        "pattern": "\\b(class|interface|enum|package|import)\\b",
-        "style": "keyword"
-      },
-      {
-        "pattern": "\"(?:[^\"\\\\]|\\\\.)*\"",
-        "style": "string"
-      },
-      {
-        "pattern": "(${identifier})\\(",
-        "styles": [0, "method", 1, "operator"]
-      },
-      {
-        "pattern": "//.*",
-        "style": "comment"
-      },
-      {
-        "pattern": "/\\*",
-        "style": "comment",
-        "state": "longComment"
-      }
-    ],
-    "longComment": [
-      {
-        "pattern": "\\s\\S",
-        "style": "comment"
-      },
-      {
-        "pattern": "\\*/",
-        "style": "comment",
-        "state": "default"
-      }
-    ]
-  }
-}
-)";
-const char* java_code_text = R"(
-package com.test;
-
-import java.util.*;
-
-public class Main {
-  public static void main() {
-    /**
-    aaaa
-    bbbb
-    */
-    System.out.println("HelloWorld");
-  }
-}
-)";
+static const char* kSyntaxJavaPath = TESTS_DIR"/syntax/java.json";
+static const char* kTestJavaPath = TESTS_DIR"/syntax/test.java";
 
 TEST_CASE("Highlight Fully") {
   Ptr<HighlightEngine> engine = MAKE_PTR<HighlightEngine>();
-  engine->compileSyntaxFromJson(java_rule_json);
-  Ptr<Document> document = MAKE_PTR<Document>("test.java", java_code_text);
+  engine->compileSyntaxFromFile(kSyntaxJavaPath);
+  String code_txt = FileUtil::readString(kTestJavaPath);
+  Ptr<Document> document = MAKE_PTR<Document>("test.java", code_txt);
   Ptr<DocumentAnalyzer> analyzer = engine->loadDocument(document);
   Ptr<DocumentHighlight> highlight = analyzer->analyzeFully();
   highlight->dump();
 }
 
 TEST_CASE("Highlight Fully Benchmark") {
+  Ptr<HighlightEngine> engine = MAKE_PTR<HighlightEngine>();
+  engine->compileSyntaxFromFile(kSyntaxJavaPath);
+  String code_txt = FileUtil::readString(kTestJavaPath);
+  Ptr<Document> document = MAKE_PTR<Document>("test.java", code_txt);
+  Ptr<DocumentAnalyzer> analyzer = engine->loadDocument(document);
   BENCHMARK("Highlight Fully Performance") {
-
+    Ptr<DocumentHighlight> highlight = analyzer->analyzeFully();
   };
 }

@@ -34,6 +34,16 @@ namespace NS_FASTHIGHLIGHT {
     return message_;
   }
 
+  // ===================================== TokenRule ============================================
+  const String& TokenRule::getGroupStyle(int32_t group) const {
+    auto it = styles.find(group);
+    if (it == styles.end()) {
+      return kDefaultStyle;
+    }
+    return it->second;
+  }
+
+  String TokenRule::kDefaultStyle;
   TokenRule TokenRule::kEmpty;
   StateRule StateRule::kEmpty;
   // ===================================== SyntaxRule ============================================
@@ -82,6 +92,17 @@ namespace NS_FASTHIGHLIGHT {
     syntax_rule->dump();
 #endif
     return syntax_rule;
+  }
+
+  Ptr<SyntaxRule> SyntaxRuleManager::compileSyntaxFromFile(const String& file) {
+    if (!FileUtil::isFile(file)) {
+      return nullptr;
+    }
+    String content = FileUtil::readString(file);
+    if (content.empty()) {
+      return nullptr;
+    }
+    return compileSyntaxFromJson(content);
   }
 
   Ptr<SyntaxRule> SyntaxRuleManager::getSyntaxRuleByName(const String& extension) {
@@ -574,12 +595,14 @@ namespace NS_FASTHIGHLIGHT {
         result.token_rule_idx = rule_idx;
         result.is_potential_multi_line = token_rule.is_multi_line;
         result.goto_state = token_rule.goto_state;
+        result.style = token_rule.getGroupStyle(0);
         result.matched_group = rule_group_offset;
 
         for (int32_t group = rule_group_offset + 1;group < rule_group_offset + token_rule.group_count;++group) {
           if (region->beg[group] == static_cast<int>(match_start_byte) &&
             region->end[group] == static_cast<int>(match_end_byte)) {
             result.matched_group = group;
+            result.style = token_rule.getGroupStyle(group);
             break;
           }
         }
@@ -607,6 +630,10 @@ namespace NS_FASTHIGHLIGHT {
   // ===================================== HighlightEngine ============================================
   void HighlightEngine::compileSyntaxFromJson(const String& json) const {
     syntax_rule_manager_->compileSyntaxFromJson(json);
+  }
+
+  void HighlightEngine::compileSyntaxFromFile(const String& file) const {
+    syntax_rule_manager_->compileSyntaxFromFile(file);
   }
 
   Ptr<DocumentAnalyzer> HighlightEngine::loadDocument(const Ptr<Document>& document) {

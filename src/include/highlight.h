@@ -59,6 +59,9 @@ namespace NS_FASTHIGHLIGHT {
     /// 要跳转的state
     int32_t goto_state {-1};
 
+    const String& getGroupStyle(int32_t group) const;
+
+    static String kDefaultStyle;
     static TokenRule kEmpty;
 #ifdef FH_DEBUG
     void dump() const {
@@ -129,6 +132,10 @@ namespace NS_FASTHIGHLIGHT {
     /// 通过json解析语法规则
     /// @param json 语法规则文件的json
     Ptr<SyntaxRule> compileSyntaxFromJson(const String& json);
+
+    /// 解析语法规则
+    /// @param file 语法规则定义文件(json)
+    Ptr<SyntaxRule> compileSyntaxFromFile(const String& file);
 
     /// 获取指定名称的语法规则(如 java)
     /// @param extension 语法规则名称
@@ -291,6 +298,10 @@ namespace NS_FASTHIGHLIGHT {
     /// 编译语法规则
     /// @param json 语法规则的json文本
     void compileSyntaxFromJson(const String& json) const;
+
+    /// 编译语法规则
+    /// @param file 语法规则文件
+    void compileSyntaxFromFile(const String& file) const;
 
     /// 加载文本并进行首次分析
     /// @param document 文本内容

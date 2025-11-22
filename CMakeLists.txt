@@ -13,6 +13,7 @@ endif ()
 
 # options
 option(BUILD_TESTING "Includes testing source for unit tests" ON)
+add_definitions(-DTESTS_DIR="${CMAKE_SOURCE_DIR}/tests")
 add_definitions(-DFH_DEBUG=1)
 
 # initial config
