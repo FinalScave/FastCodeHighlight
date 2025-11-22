@@ -1,13 +1,15 @@
 # 项目结构
 ```
 ├── 3dparty 第三方C++库
+├── docs 文档目录
 ├── platform 各平台C++接口桥接项目（Windows和Linux不需要）
     ├── Android Android平台SDK工程
     └── Emscripten WASM SDK工程
     └── OHOS 鸿蒙 SDK工程
-└── src C++源代码目录
+├── src C++源代码目录
     ├── core 核心代码
     └── include 对外开放的头文件
+└── tests 单元测试目录
 ```
 
 # 开发环境
