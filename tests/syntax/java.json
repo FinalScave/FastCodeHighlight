@@ -13,12 +13,28 @@
         "style": "keyword"
       },
       {
+        "pattern": "\\b(public|private|protected|default|static|final|abstract|synchronized|transient|native|volatile)\\b",
+        "style": "keyword"
+      },
+      {
+        "pattern": "\\b(extends|implements|new|this|super|try|catch|finally|throw|throws|switch|case|if|else|for|while|do)\\b",
+        "style": "keyword"
+      },
+      {
         "pattern": "\"(?:[^\"\\\\]|\\\\.)*\"",
         "style": "string"
       },
       {
         "pattern": "(${identifier})\\(",
-        "styles": [0, "method", 1, "operator"]
+        "styles": [1, "method"]
+      },
+      {
+        "pattern": "${identifier}",
+        "style": "identifier"
+      },
+      {
+        "pattern": "\\.|\\(|\\[|\\?|!|@|%|^|&|\\||\\+|-|\\*|/|<|>|=|,|\\)|]|{|}|;|:",
+        "style": "punctuation"
       },
       {
         "pattern": "//.*",
@@ -30,7 +46,7 @@
         "state": "longComment"
       },
       {
-        "pattern": "\\s\\S+",
+        "pattern": ".",
         "style": "text"
       }
     ],

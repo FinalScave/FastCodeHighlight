@@ -171,6 +171,9 @@ namespace NS_FASTHIGHLIGHT {
     std::stringstream ss(text);
     String line;
     while (std::getline(ss, line)) {
+      if (line.back() == '\r') {
+        line = line.substr(0, line.length() - 1);
+      }
       result.push_back(line);
     }
     // 如果最后以换行符结束，添加一个空行

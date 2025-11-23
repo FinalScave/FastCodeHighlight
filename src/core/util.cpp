@@ -7,6 +7,7 @@
 #include <iconv.h>
 #endif
 #include <fstream>
+#include <oniguruma/oniguruma.h>
 #include "util.h"
 
 #ifdef _WIN32
@@ -317,6 +318,23 @@ namespace NS_FASTHIGHLIGHT {
       }
     }
     return false;
+  }
+
+  String PatternUtil::getPatternError(const String& pattern_ptr) {
+    OnigRegex reg;
+    OnigErrorInfo einfo;
+    OnigUChar error_buf[ONIG_MAX_ERROR_MESSAGE_LEN];
+    OnigUChar* pattern = (OnigUChar*)pattern_ptr.c_str();
+    OnigUChar* pattern_end = pattern + strlen((char*)pattern);
+    int r = onig_new(&reg, pattern, pattern_end,
+      ONIG_OPTION_DEFAULT, ONIG_ENCODING_UTF8, ONIG_SYNTAX_DEFAULT, &einfo);
+    if (r != ONIG_NORMAL) {
+      onig_error_code_to_str(error_buf, r, &einfo);
+      onig_free(reg);
+      return {reinterpret_cast<const char*>(error_buf)};
+    }
+    onig_free(reg);
+    return {};
   }
 
   // ======================================== FileUtil =================================================

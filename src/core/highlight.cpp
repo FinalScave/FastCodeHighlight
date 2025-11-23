@@ -89,7 +89,7 @@ namespace NS_FASTHIGHLIGHT {
       compileStatePattern(pair.second);
     }
 #ifdef FH_DEBUG
-    syntax_rule->dump();
+    //syntax_rule->dump();
 #endif
     return syntax_rule;
   }
@@ -280,16 +280,21 @@ namespace NS_FASTHIGHLIGHT {
     // 将所有token的表达式合成一个大表达式
     for (size_t i = 0; i < token_size; ++i) {
       TokenRule& token_rule = state_rule.token_rules[i];
+      // 检测每个token的pattern是否有错误
+      String err = PatternUtil::getPatternError(token_rule.pattern);
+      if (!err.empty()) {
+        throw SyntaxRuleParseError(SyntaxRuleParseError::kErrCodePatternInvalid, err + ": " + token_rule.pattern);
+      }
       // 计算每个token的捕获组数量
       token_rule.group_count = PatternUtil::countCaptureGroups(token_rule.pattern);
-      token_rule.group_offset = total_group_count;
+      token_rule.group_offset = 1 + total_group_count;
+      total_group_count += 1 + token_rule.group_count;
       if (i > 0) {
         merged_pattern += "|";
       }
       merged_pattern += "(";
       merged_pattern += token_rule.pattern;
       merged_pattern += ")";
-      total_group_count += 1 + token_rule.group_count;
     }
     state_rule.group_count = total_group_count;
     // 编译合并的大表达
@@ -566,6 +571,9 @@ namespace NS_FASTHIGHLIGHT {
     if (match_byte_pos >= 0) {
       size_t match_start_byte = match_byte_pos;
       size_t match_end_byte = region->end[0];
+      if (match_end_byte <= match_start_byte) {
+        return result;
+      }
       size_t match_length_bytes = match_end_byte - match_start_byte;
 
       size_t match_start_char = Utf8Util::bytePosToCharPos(text, match_start_byte);

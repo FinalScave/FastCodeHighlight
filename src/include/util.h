@@ -125,6 +125,11 @@ namespace NS_FASTHIGHLIGHT {
     /// 判断Pattern是否包含多行匹配
     /// @param pattern_ptr Pattern字符串
     static bool isMultiLinePattern(const String& pattern_ptr);
+
+    /// 尝试编译表达式检测有没有错误
+    /// @param pattern_ptr Pattern字符串
+    /// @return 如果有错误返回相应错误，没有错误返回空文本
+    static String getPatternError(const String& pattern_ptr);
   };
 
   /// 文件操作工具类
